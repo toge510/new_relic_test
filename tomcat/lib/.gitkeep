@@ -1,0 +1,2 @@
+# Placeholder to ensure Docker COPY of tomcat/lib succeeds
+# Add mysql-connector-java.jar here to vendor the MySQL JDBC driver.
