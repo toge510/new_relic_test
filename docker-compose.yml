@@ -15,4 +15,49 @@ services:
       context: ./tomcat
     image: tomcat:9.0.90-jdk8-temurin-jammy
     environment:
-      - WEATHER_API_KEY=${WEATHER_API_KEY}
+      WEATHER_API_KEY: ${WEATHER_API_KEY}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_APP_NAME: "APP_TOMCAT_20251102"
+      NEW_RELIC_LOG_LEVEL: "info"
+      NEW_RELIC_LOG_FILE_PATH: "/dev/stdout"
+      CATALINA_OPTS: >-
+        -javaagent:/usr/local/newrelic/newrelic.jar
+        -Dcom.sun.management.jmxremote.rmi.port=9012
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.port=9012
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: weatherdb
+      DB_USER: weather
+      DB_PASSWORD: weatherpass
+    volumes:
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - mysql
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: weatherdb
+      MYSQL_USER: weather
+      MYSQL_PASSWORD: weatherpass
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Do not expose MySQL port to the host by default for security
+    # ports:
+    #   - "3306:3306"
+
+volumes:
+  db_data:
