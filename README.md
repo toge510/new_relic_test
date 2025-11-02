@@ -8,7 +8,6 @@
 - フロントは Apache HTTPD（リバースプロキシ）で受け、Tomcat の Servlet (`WeatherServlet`) にリクエストを中継します。
 - Tomcat のサーブレットが OpenWeatherMap API を呼び出して JSON を返します。クライアント側（JSP + JavaScript）がその JSON を受け取り、見やすいカード形式で表示します。
 - 使用する Tomcat イメージ: `tomcat:9.0.90-jdk8-temurin-jammy`（既に Dockerfile / docker-compose で指定されています）
- - 使用する Tomcat イメージ: `tomcat:9.0.90-jdk8-temurin-jammy`（既に Dockerfile / docker-compose で指定されています）
  - 配布方式: アプリケーションはビルド時に `ROOT.war` を作成して Tomcat の `webapps/` に配置する WAR 形式でデプロイされます（`tomcat/Dockerfile` が WAR の作成を行います）。
 
 ## 事前準備
