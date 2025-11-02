@@ -8,6 +8,8 @@
 - フロントは Apache HTTPD（リバースプロキシ）で受け、Tomcat の Servlet (`WeatherServlet`) にリクエストを中継します。
 - Tomcat のサーブレットが OpenWeatherMap API を呼び出して JSON を返します。クライアント側（JSP + JavaScript）がその JSON を受け取り、見やすいカード形式で表示します。
 - 使用する Tomcat イメージ: `tomcat:9.0.90-jdk8-temurin-jammy`（既に Dockerfile / docker-compose で指定されています）
+ - 使用する Tomcat イメージ: `tomcat:9.0.90-jdk8-temurin-jammy`（既に Dockerfile / docker-compose で指定されています）
+ - 配布方式: アプリケーションはビルド時に `ROOT.war` を作成して Tomcat の `webapps/` に配置する WAR 形式でデプロイされます（`tomcat/Dockerfile` が WAR の作成を行います）。
 
 ## 事前準備
 
@@ -41,6 +43,8 @@ export WEATHER_API_KEY=your_openweathermap_api_key_here
 docker compose up --build
 ```
 
+注: `docker compose up --build` は `tomcat/Dockerfile` を使って Java ソースをコンパイルし、`ROOT.war` を作成して Tomcat にデプロイします。開発中に Maven/Gradle を使う場合は、ローカルで WAR をビルドして `tomcat/webapp/` に配置する方法も可能です（下記「実装メモ」を参照）。
+
 4. ブラウザでアクセス:
 
 http://localhost:8000/
@@ -63,8 +67,20 @@ docker compose logs -f
 - サーブレット: `tomcat/src/WeatherServlet.java`
 	- OpenWeatherMap の REST エンドポイントを呼び出し、JSON をそのまま返しています。
 	- 現在はレスポンスに `Content-Type: application/json; charset=UTF-8` を設定しています。
+	- ビルド/デプロイ: `tomcat/Dockerfile` は `tomcat/src` の Java ソースをコンパイルし、`webapp` の静的ファイルと合わせて `/usr/local/tomcat/webapps/ROOT.war` を作成します。コンテナ起動時にこの WAR が Tomcat によって展開されます。
 - フロント: `tomcat/webapp/index.jsp`
 	- JavaScript(fetch) で `/weather?city=...` を呼び、受け取った JSON を DOM に描画します。
+
+## WAR ビルドの代替案（推奨）
+
+このリポジトリでは簡易的に `javac` と `jar` を使って Dockerfile 内で WAR を作成しています。将来的に依存管理やテスト、複数クラスのビルドが必要になった場合は Maven か Gradle に移行することをおすすめします。
+
+簡単な Maven の手順例（ローカルで WAR を作成してデプロイする場合）:
+
+1. プロジェクトルートに `pom.xml` を作成し、パッケージタイプを `war` に設定。
+2. `mvn package` を実行すると `target/*.war` が生成されるので、それを `tomcat/webapp/ROOT.war` にコピーしてから `docker compose up` で起動します。
+
+この方法にすることで IDE や CI でのビルドが容易になり、外部ライブラリは `WEB-INF/lib` に自動で配置されます。
 
 ## MySQL の件について
 
