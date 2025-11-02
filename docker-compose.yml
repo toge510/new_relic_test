@@ -1,0 +1,18 @@
+services:
+  httpd:
+    build:
+      context: ./apache
+    ports:
+      - "8000:80"
+    volumes:
+      - ./apache/httpd.conf:/usr/local/apache2/conf/httpd.conf
+      - ./apache/workers.properties:/usr/local/apache2/conf/workers.properties
+    depends_on:
+      - tomcat
+
+  tomcat:
+    build:
+      context: ./tomcat
+    image: tomcat:9.0.90-jdk8-temurin-jammy
+    environment:
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
