@@ -13,7 +13,7 @@ services:
   tomcat:
     build:
       context: ./tomcat
-    image: tomcat:9.0.90-jdk8-temurin-jammy
+    # image: tomcat:9.0.90-jdk8-temurin-jammy
     environment:
       WEATHER_API_KEY: ${WEATHER_API_KEY}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
@@ -58,6 +58,20 @@ services:
     # Do not expose MySQL port to the host by default for security
     # ports:
     #   - "3306:3306"
+
+  agent:
+    container_name: newrelic-infra
+    build:
+      context: ./newrelic-infra
+    cap_add:
+      - SYS_PTRACE
+    network_mode: bridge
+    pid: host
+    privileged: true
+    volumes:
+      - "/:/host:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    restart: unless-stopped
 
 volumes:
   db_data:
