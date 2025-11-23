@@ -20,6 +20,8 @@
         .icon { width:96px; height:96px; }
         .error { color:#b00020; }
         .row { display:flex; gap:16px; margin-top:8px; }
+        #db-history-result { margin-top:1rem; }
+        .history-item { border-bottom:1px solid #eee; padding:8px 0; }
     </style>
 </head>
 <body>
@@ -27,25 +29,31 @@
         <h1>Weather App</h1>
         <form id="weather-form" action="/weather" method="get">
             <label for="city" class="small">City</label>
-            <input type="text" id="city" name="city" placeholder="e.g. Tokyo" required />
+            <input type="text" id="city" name="city" placeholder="e.g. Tokyo" />
             <button id="get-weather">Get Weather</button>
+            <button type="button" id="get-db-history">Show DB History</button>
         </form>
 
         <div id="weather-result" aria-live="polite"></div>
+        <div id="db-history-result"></div>
     </div>
 
     <script>
         const form = document.getElementById('weather-form');
         const result = document.getElementById('weather-result');
-        const btn = document.getElementById('get-weather');
+        const dbHistoryResult = document.getElementById('db-history-result');
+        const getWeatherBtn = document.getElementById('get-weather');
+        const getDbHistoryBtn = document.getElementById('get-db-history');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const city = document.getElementById('city').value.trim();
             if (!city) return;
+            
+            getWeatherBtn.disabled = true;
+            getWeatherBtn.textContent = 'Loading...';
+            dbHistoryResult.innerHTML = '';
             result.innerHTML = '';
-            btn.disabled = true;
-            btn.textContent = 'Loading...';
 
             try {
                 const resp = await fetch(`/weather?city=${encodeURIComponent(city)}`);
@@ -60,10 +68,56 @@
             } catch (err) {
                 result.innerHTML = `<div class="error">Network error: ${escapeHtml(err.message)}</div>`;
             } finally {
-                btn.disabled = false;
-                btn.textContent = 'Get Weather';
+                getWeatherBtn.disabled = false;
+                getWeatherBtn.textContent = 'Get Weather';
             }
         });
+
+        getDbHistoryBtn.addEventListener('click', async () => {
+            const city = document.getElementById('city').value.trim();
+            
+            getDbHistoryBtn.disabled = true;
+            dbHistoryResult.innerHTML = 'Loading history...';
+            result.innerHTML = '';
+
+            let url = '/weather?action=history';
+            if (city) {
+                url += `&city=${encodeURIComponent(city)}`;
+            }
+
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    const text = await resp.text();
+                    dbHistoryResult.innerHTML = `<div class="error">${escapeHtml(text || 'Could not fetch history')}</div>`;
+                    return;
+                }
+                const data = await resp.json();
+                renderDbHistory(data);
+            } catch (err) {
+                dbHistoryResult.innerHTML = `<div class="error">Network error: ${escapeHtml(err.message)}</div>`;
+            } finally {
+                getDbHistoryBtn.disabled = false;
+            }
+        });
+
+        function renderDbHistory(data) {
+            if (!data || data.length === 0) {
+                dbHistoryResult.innerHTML = '<div class="small">No history found.</div>';
+                return;
+            }
+            let html = '<h3>Database History (Last 10)</h3>';
+            data.forEach(item => {
+                const weatherData = JSON.parse(item.body);
+                const temp = weatherData.main && typeof weatherData.main.temp !== 'undefined' ? Math.round(weatherData.main.temp) : '--';
+                html += `
+                    <div class="history-item small">
+                        <strong>${escapeHtml(item.city)}</strong> at ${escapeHtml(item.created_at)}: ${temp}°C
+                    </div>
+                `;
+            });
+            dbHistoryResult.innerHTML = html;
+        }
 
         function renderWeather(data) {
             if (!data || data.cod && data.cod !== 200) {

@@ -22,12 +22,6 @@ services:
       NEW_RELIC_LOG_FILE_PATH: "/dev/stdout"
       CATALINA_OPTS: >-
         -javaagent:/usr/local/newrelic/newrelic.jar
-        -Dcom.sun.management.jmxremote.rmi.port=9012
-        -Dcom.sun.management.jmxremote.ssl=false
-        -Dcom.sun.management.jmxremote.local.only=false
-        -Dcom.sun.management.jmxremote.authenticate=false
-        -Dcom.sun.management.jmxremote
-        -Dcom.sun.management.jmxremote.port=9012
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_NAME: weatherdb
