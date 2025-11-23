@@ -1,97 +1,74 @@
-# Weather アプリケーション
+# 天気アプリケーション
 
-このリポジトリは、Apache HTTPD と Tomcat（Java Servlet）を使った簡単な天気アプリケーションです。
-ブラウザから都市名を入力すると、OpenWeatherMap の外部 API を呼び出して現在の天気情報を表示します。
+フォームに都市名を入力すると、現在の天気情報を表示するアプリケーション。
+
+「Get Weather」
+
+<img src="./images/app.png">
+
+<br>
+
+過去の検索結果を閲覧できる。
+
+「Show DB History」
+
+<img src="./images/app1.png">
 
 ## 概要
 
-- フロントは Apache HTTPD（リバースプロキシ）で受け、Tomcat の Servlet (`WeatherServlet`) にリクエストを中継します。
-- Tomcat のサーブレットが OpenWeatherMap API を呼び出して JSON を返します。クライアント側（JSP + JavaScript）がその JSON を受け取り、見やすいカード形式で表示します。
-- 使用する Tomcat イメージ: `tomcat:9.0.90-jdk8-temurin-jammy`（既に Dockerfile / docker-compose で指定されています）
- - 配布方式: アプリケーションはビルド時に `ROOT.war` を作成して Tomcat の `webapps/` に配置する WAR 形式でデプロイされます（`tomcat/Dockerfile` が WAR の作成を行います）。
+- **フロントエンド**: Apache HTTPD がリバースプロキシとしてリクエストを受け、バックエンドの Tomcat に中継する。
+- **バックエンド**: Tomcat 上の Java Servlet (`WeatherServlet`) が OpenWeatherMap API を呼び出し、天気情報を取得する。
+- **データベース**: MySQL を使用して、天気情報の検索履歴を永続化する。
+- **履歴管理**:
+  - 新しい天気を検索すると、結果が履歴としてデータベースに保存される。
+  - 同じ都市の履歴が3件を超えると、最も古いデータが自動的に削除される。
+- **デプロイ**: `docker-compose` を利用して、すべてのサービス（httpd, tomcat, mysql）をコンテナとして起動する。`tomcat` のイメージビルド時に Java ソースがコンパイルされ、`ROOT.war` としてデプロイされる。
 
 ## 事前準備
 
-- Docker
-- Docker Compose
-- OpenWeatherMap の API キー（無料で取得可）: https://openweathermap.org/appid
-
-注意: 現在 `docker-compose.yml` に環境変数 `WEATHER_API_KEY` が設定されていますが、セキュリティのため自分のキーに差し替えるか、Compose の環境設定を `.env` などで管理することを推奨します。
+- OpenWeatherMap の API キー（無料で取得可）: https://openweathermap.org/
 
 ## 環境変数
 
-- WEATHER_API_KEY: OpenWeatherMap の API キー（必須）
+このアプリケーションは、`docker-compose.yml` 内で以下の環境変数を設定して `tomcat` サービスに渡す。
+
+- `WEATHER_API_KEY`: OpenWeatherMap の API キー（**必須**）
+- `DB_HOST`: データベースのホスト名 (デフォルト: `mysql`)
+- `DB_PORT`: データベースのポート (デフォルト: `3306`)
+- `DB_NAME`: データベース名 (デフォルト: `weatherdb`)
+- `DB_USER`: データベースのユーザー名 (デフォルト: `weather`)
+- `DB_PASSWORD`: データベースのパスワード (デフォルト: `weatherpass`)
 
 ## 使い方（ローカル起動）
 
-1. リポジトリのルートに移動:
+1. リポジトリのルートに `.env` ファイルを作成し、`WEATHER_API_KEY` を設定する。
 
-```bash
-cd /path/to/new_relic_test
-```
+2. Docker Compose でビルド＆起動する。
 
-2. 環境変数を設定（仮に bash を使う場合）:
+   ```bash
+   docker compose up --build -d
+   ```
 
-```bash
-export WEATHER_API_KEY=your_openweathermap_api_key_here
-```
+3. ブラウザでアクセスする。
 
-3. Docker Compose でビルド＆起動:
+   http://localhost:8000/
 
-```bash
-docker compose up --build
-```
+   フォームに都市名（例: Tokyo）を入力して「Get Weather」を押すと、天気情報が表示される。また、ページ下部には検索履歴が表示される。
 
-注: `docker compose up --build` は `tomcat/Dockerfile` を使って Java ソースをコンパイルし、`ROOT.war` を作成して Tomcat にデプロイします。開発中に Maven/Gradle を使う場合は、ローカルで WAR をビルドして `tomcat/webapp/` に配置する方法も可能です（下記「実装メモ」を参照）。
+- **データベースの確認**:
+  MySQL コンテナに接続してデータを直接確認することも可能である。
+  ```bash
+  docker compose exec mysql mysql -u weather -pweatherpass weatherdb
+  ```
+  ```sql
+  SELECT * FROM weather_history;
+  ```
 
-4. ブラウザでアクセス:
+## 実装メモ
 
-http://localhost:8000/
-
-フォームに都市名（例: Tokyo）を入力して「Get Weather」を押すと、天気情報（気温、体感、湿度、風速、説明、アイコン）が表示されます。
-
-## 動作確認・トラブルシューティング
-
-- 表示が文字化けする場合は、ブラウザの Network タブで HTML レスポンスの `Content-Type` ヘッダに `charset=UTF-8` が含まれているか確認してください。
-- サーバのログを確認するには、Compose のログを参照します:
-
-```bash
-docker compose logs -f
-```
-
-- コンテナ内から API にアクセスできない場合は、ホストやネットワーク設定（プロキシなど）を確認してください。
-
-## 実装メモ（開発者向け）
-
-- サーブレット: `tomcat/src/WeatherServlet.java`
-	- OpenWeatherMap の REST エンドポイントを呼び出し、JSON をそのまま返しています。
-	- 現在はレスポンスに `Content-Type: application/json; charset=UTF-8` を設定しています。
-	- ビルド/デプロイ: `tomcat/Dockerfile` は `tomcat/src` の Java ソースをコンパイルし、`webapp` の静的ファイルと合わせて `/usr/local/tomcat/webapps/ROOT.war` を作成します。コンテナ起動時にこの WAR が Tomcat によって展開されます。
-- フロント: `tomcat/webapp/index.jsp`
-	- JavaScript(fetch) で `/weather?city=...` を呼び、受け取った JSON を DOM に描画します。
-
-## WAR ビルドの代替案（推奨）
-
-このリポジトリでは簡易的に `javac` と `jar` を使って Dockerfile 内で WAR を作成しています。将来的に依存管理やテスト、複数クラスのビルドが必要になった場合は Maven か Gradle に移行することをおすすめします。
-
-簡単な Maven の手順例（ローカルで WAR を作成してデプロイする場合）:
-
-1. プロジェクトルートに `pom.xml` を作成し、パッケージタイプを `war` に設定。
-2. `mvn package` を実行すると `target/*.war` が生成されるので、それを `tomcat/webapp/ROOT.war` にコピーしてから `docker compose up` で起動します。
-
-この方法にすることで IDE や CI でのビルドが容易になり、外部ライブラリは `WEB-INF/lib` に自動で配置されます。
-
-## MySQL の件について
-
-元の要件で MySQL を含めることがありましたが、このリポジトリの現状の `docker-compose.yml` には MySQL サービスは含まれていません。もし天気データのキャッシュや履歴保存を行いたい場合は、`docker-compose.yml` に MySQL サービスを追加し、サーブレット側で JDBC 経由で保存/取得する実装を追加してください。
-
-## 注意
-
-- リポジトリ内の `docker-compose.yml` に API キーが平文で置かれている場合は、公開リポジトリにプッシュしないよう注意してください。`.env` を使うか CI/Secrets 機能で管理することを推奨します。
-
-## ライセンス
-
-このプロジェクトには特にライセンスファイルが含まれていません。使用・配布はリポジトリの所有者の方針に従ってください。
-
----
-更新日: 2025-11-02
+- **サーブレット**: `tomcat/src/WeatherServlet.java`
+  - OpenWeatherMap API の呼び出しと、JDBC を介した MySQL への履歴の保存・削除処理を実装している。
+- **フロントエンド**: `tomcat/webapp/index.jsp`
+  - `fetch` API を使用して `/weather?city=...`（天気取得）と `/weather?action=history`（履歴取得）のエンドポイントを呼び出し、結果を動的に描画する。
+- **データベース初期化**: `mysql/init.sql`
+  - コンテナ初回起動時に `weather_history` テーブルを作成する。
